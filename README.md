@@ -27,7 +27,8 @@ PREFIX dbp: <http://dbpedia.org/property/>
 
 SELECT ?capital ?populationTotal WHERE {
     ?capital dct:subject dcb:Capitals_in_Europe ;
-             dbp:populationTotal ?populationTotal .
+             dbp:populationTotal ?populationTotal ; 
+             foaf:name ?name. 
 }
 LIMIT 5
 ```
