@@ -1,0 +1,1 @@
+from ipython_sparql_pandas.sparql import sparql, load_ipython_extension
