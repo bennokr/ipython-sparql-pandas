@@ -25,11 +25,12 @@ PREFIX dct: <http://purl.org/dc/terms/>
 PREFIX dcb: <http://dbpedia.org/resource/Category:>
 PREFIX dbp: <http://dbpedia.org/property/>
 
-SELECT ?capital ?populationTotal WHERE {
+SELECT DISTINCT ?name ?capital ?populationTotal WHERE {
     ?capital dct:subject dcb:Capitals_in_Europe ;
              dbp:populationTotal ?populationTotal ; 
              foaf:name ?name. 
 }
+ORDER BY DESC(?populationTotal)
 LIMIT 5
 ```
 
