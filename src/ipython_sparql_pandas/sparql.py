@@ -4,7 +4,7 @@ from IPython.core.magic import register_cell_magic, needs_local_scope
 from IPython.core.magic_arguments import argument, magic_arguments, parse_argstring
 from SPARQLWrapper import SPARQLWrapper, JSON
 from IPython.core.display import display_javascript, Javascript
-from rdflib import URIRef, Literal
+from rdflib import URIRef, Literal, BNode
 import pandas as pd
 
 
@@ -25,12 +25,14 @@ def sparql(line, cell, local_ns=None):
     if args.endpoint in local_ns:
         g = local_ns[args.endpoint]
         results = g.query(cell)
-        if results.bindings:
-            df = pd.DataFrame(results.bindings)
-            df = df[df.columns[::-1]]
-            df.columns = [str(c) for c in df.columns]
-        elif None != results.askAnswer:
-            df = pd.DataFrame([[results.askAnswer]], columns="ASK")
+        if results.type == "ASK":
+            df = pd.DataFrame([[results.askAnswer]], columns=["ASK"])
+        elif results.type == "SELECT":
+            cols = [str(v) for v in results.vars]
+            df = pd.DataFrame(
+                [[row[i] for i in range(len(cols))] for row in results],
+                columns=cols,
+            )
         else:
             df = results.graph
     else:
@@ -51,28 +53,29 @@ def sparql(line, cell, local_ns=None):
 def convert_node(obj):
     if obj["type"] == "uri":
         return URIRef(obj["value"])
-    if obj["type"] == "typed-literal" or "literal":
+    if obj["type"] == "bnode":
+        return BNode(obj["value"])
+    if obj["type"] in ("typed-literal", "literal"):
         if "datatype" in obj:
-            dt = URIRef(obj["datatype"])
-            return Literal(obj["value"], datatype=dt)
-        elif "xsd:lang" in obj:
-            lang = obj["xsd:lang"]
+            return Literal(obj["value"], datatype=URIRef(obj["datatype"]))
+        lang = obj.get("xml:lang") or obj.get("xsd:lang")
+        if lang:
             return Literal(obj["value"], lang=lang)
-        else:
-            return Literal(obj["value"])
+        return Literal(obj["value"])
 
     raise Exception(f'Invalid RDF node type {obj["type"]}')
 
 
 def df_results(result):
-
     if "boolean" in result:
-        df = pd.DataFrame([[result["boolean"]]], columns="ASK")
-    else:
-        df = pd.DataFrame(result["results"]["bindings"])
-        df.applymap(convert_node)
+        return pd.DataFrame([[result["boolean"]]], columns=["ASK"])
 
-    return df
+    cols = result["head"]["vars"]
+    rows = [
+        [convert_node(b[v]) if v in b else None for v in cols]
+        for b in result["results"]["bindings"]
+    ]
+    return pd.DataFrame(rows, columns=cols)
 
 
 def load_ipython_extension(ipython):
